@@ -27,7 +27,11 @@ jobs:
       - name: Install build toolchain
         run: |
           brew install meson ninja pkg-config xcodegen qemu python3 || brew upgrade meson ninja pkg-config xcodegen qemu python3
-          pip3 install --quiet meson ninja 2>/dev/null || true
+          # virglrenderer's meson needs PyYAML; brew's python3 does not ship it.
+          pip3 install --break-system-packages --quiet pyyaml 2>/dev/null \
+            || pip3 install --quiet pyyaml 2>/dev/null \
+            || /opt/homebrew/bin/python3 -m pip install --break-system-packages --quiet pyyaml
+          /opt/homebrew/bin/python3 -c "import yaml; print('yaml ok', yaml.__version__)" || true
           echo "tools: $(command -v meson) $(command -v ninja) $(command -v xcodegen) $(command -v qemu-img)"
 
       - name: Install Rust (aarch64-apple-ios)
