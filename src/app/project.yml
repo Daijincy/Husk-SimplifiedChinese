@@ -151,14 +151,17 @@ targets:
         embed: true
         codeSign: true
         link: false
-      # The PS4 layer: Bachata-S4's core (branch husk) on husk-fex's FEXCore, as one dylib exporting husk_console_module_v1.
-      # Built by scripts/build_ps4_ios.sh from two repos that are not public, so this fork's cloud build does not
-      # produce it. Optional: the embed is skipped when the dylib is absent (PS4 games are simply unavailable).
-      - framework: ../../build/ios-arm64/lib/libhuskps4.dylib
-        embed: true
-        codeSign: true
-        link: false
-        optional: true
+      # NOTE (this fork): upstream also embeds a PS4 layer (libhuskps4.dylib, built
+      # by scripts/build_ps4_ios.sh from two non-public repos: Bachata-S4 on branch
+      # `husk` and husk-fex on branch `husk-fex`). Those repos are not public, so a
+      # cloud build cannot produce the dylib, and Xcode fails the embed when the
+      # file is missing. This fork omits the entry so the IPA builds without PS4;
+      # re-add the block below and run build_ps4_ios.sh to ship PS4 support.
+      #
+      #     - framework: ../../build/ios-arm64/lib/libhuskps4.dylib
+      #       embed: true
+      #       codeSign: true
+      #       link: false
     preBuildScripts:
       - name: Stage guest image
         # The Phase 0 guest is far too large for git, so it is fetched rather than
