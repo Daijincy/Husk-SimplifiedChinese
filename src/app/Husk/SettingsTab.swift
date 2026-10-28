@@ -1147,7 +1147,9 @@ struct RootSettings: View {
                     Button { machines.select(machine.id) } label: {
                         HStack(spacing: 12) {
                             Image(systemName: machine.id == machines.activeID ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(machine.id == machines.activeID ? Color.green.huskGradient : .secondary)
+                                .foregroundStyle(machine.id == machines.activeID
+                                                 ? AnyShapeStyle(Color.green.huskGradient)
+                                                 : AnyShapeStyle(.secondary))
                             Text(machine.name).foregroundStyle(.primary)
                             Spacer()
                             if let kind = machine.rootedBy {

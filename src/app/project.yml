@@ -2,10 +2,11 @@ name: Husk
 options:
   bundleIdPrefix: com.husk
   deploymentTarget:
-    # 15.5: what QEMU, ANGLE and rppairing are built for, and the TrollStore
-    # and Dopamine iOS 15 devices (#92). Compat15.swift stands in for the
-    # iOS 16 SwiftUI the screens use.
-    iOS: "15.5"
+    # 16.0: this fork is built on Xcode 26 (macos-latest), whose SwiftUI makes
+    # `buildIf` require iOS 16, so an iOS 15 target no longer compiles. This
+    # drops the iOS-15 TrollStore/Dopamine devices upstream kept. Compat15.swift
+    # remains and harmlessly no-ops at the higher target.
+    iOS: "16.0"
   createIntermediateGroups: true
 
 settings:
