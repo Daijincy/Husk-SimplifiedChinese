@@ -152,12 +152,13 @@ targets:
         codeSign: true
         link: false
       # The PS4 layer: Bachata-S4's core (branch husk) on husk-fex's FEXCore, as one dylib exporting husk_console_module_v1.
-      # Built by scripts/build_ps4_ios.sh. Embedded, not linked: it needs iOS 17.4 and is opened by path only there
-      # (PS4Store.moduleURL), by the console host (src/translation-layer-next/husk-console-host.c).
+      # Built by scripts/build_ps4_ios.sh from two repos that are not public, so this fork's cloud build does not
+      # produce it. Optional: the embed is skipped when the dylib is absent (PS4 games are simply unavailable).
       - framework: ../../build/ios-arm64/lib/libhuskps4.dylib
         embed: true
         codeSign: true
         link: false
+        optional: true
     preBuildScripts:
       - name: Stage guest image
         # The Phase 0 guest is far too large for git, so it is fetched rather than
