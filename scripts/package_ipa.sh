@@ -135,14 +135,15 @@ elif [ -n "$EXE" ]; then
     printf "  ok       %-28s %s\n" "executable present" "$EXE"
 fi
 
-# Both dylibs must be embedded, or the app dies at launch with a dyld error.
+# The two always-required dylibs must be embedded, or the app dies at launch
+# with a dyld error. ANGLE is checked here because it was not, and an IPA
+# shipped without it: the app reached qemu_egl_init_dpy_cocoa and aborted with
+# "Couldn't open @rpath/libANGLE-shared.dylib".
 #
-# ANGLE is checked here because it was not, and an IPA shipped without it: the
-# app reached qemu_egl_init_dpy_cocoa and aborted with "Couldn't open
-# @rpath/libANGLE-shared.dylib". Everything else in this validation passed. A
-# check that covers one of two required libraries is a check that reports
-# success on a bundle that cannot launch.
-for lib in libqemu-aarch64-softmmu.dylib libANGLE-shared.dylib libhuskps4.dylib; do
+# libhuskps4.dylib is the optional PS4 layer. In this fork its sources are not
+# public, so a cloud build ships without it; it is only required when it was
+# actually built (build_ps4_ios.sh). 
+for lib in libqemu-aarch64-softmmu.dylib libANGLE-shared.dylib; do
     if [ ! -f "$APP/Frameworks/$lib" ]; then
         echo "  MISSING  Frameworks/$lib" >&2
         rc=1
@@ -151,6 +152,18 @@ for lib in libqemu-aarch64-softmmu.dylib libANGLE-shared.dylib libhuskps4.dylib;
             "$(du -h "$APP/Frameworks/$lib" | cut -f1)"
     fi
 done
+if [ -f "$HUSK_ROOT/build/ios-arm64/lib/libhuskps4.dylib" ]; then
+    lib=libhuskps4.dylib
+    if [ ! -f "$APP/Frameworks/$lib" ]; then
+        echo "  MISSING  Frameworks/$lib" >&2
+        rc=1
+    else
+        printf "  ok       %-28s %s\n" "${lib%%-*} dylib embedded" \
+            "$(du -h "$APP/Frameworks/$lib" | cut -f1)"
+    fi
+else
+    echo "  note     PS4 layer not built; skipped (optional)"
+fi
 
 # Guest images, firmware, and blank disk seeds required by first launch.
 for f in vmlinuz-virt initramfs-virt husk-jit.js \
