@@ -1,0 +1,63 @@
+# Builds the Husk IPA on a GitHub-hosted macOS runner and uploads the
+# sideload-ready IPA (+ TrollStore .tipa) as build artifacts.
+#
+# Public repository -> standard hosted runners (macOS included) are free and
+# unlimited, so this does not consume billable minutes.
+#
+# The build deliberately does NOT bundle the Android system image: the big vda
+# guest is downloaded at runtime by the app (GuestImage) from the release
+# mirror, so the IPA stays light.
+
+name: build-ipa
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install build toolchain
+        run: |
+          brew install meson ninja pkg-config xcodegen qemu python3 || brew upgrade meson ninja pkg-config xcodegen qemu python3
+          pip3 install --quiet meson ninja 2>/dev/null || true
+          echo "tools: $(command -v meson) $(command -v ninja) $(command -v xcodegen) $(command -v qemu-img)"
+
+      - name: Install Rust (aarch64-apple-ios)
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/rustup.sh
+          sh /tmp/rustup.sh -y --default-toolchain stable --profile minimal
+          source "$HOME/.cargo/env"
+          rustup target add aarch64-apple-ios
+          echo "rust: $(rustc --version)"
+
+      - name: Full build (fetch sources -> cross-compile -> IPA)
+        run: |
+          ./scripts/ci_build.sh
+        env:
+          PATH: "$HOME/.cargo/bin:$PATH"
+
+      - name: Upload IPA artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: husk-ipa
+          path: |
+            build/Husk.ipa
+            build/Husk.tipa
+          if-no-files-found: error
+
+      - name: Upload guest dependency list (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            build/*.log
+          if-no-files-found: ignore

@@ -1,0 +1,1177 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+import SwiftUI
+import UniformTypeIdentifiers
+
+/// Settings, as the iOS Settings app lays them out: a card for the app up top, then groups of rows that each
+/// push a page of their own. What belongs to the app, what belongs to the emulator, and what the thing is.
+struct SettingsTab: View {
+    @AppStorage(AppWindows.defaultKey) private var multitask = false
+    @AppStorage(CompatibilityStore.askKey) private var askCompat = true
+    @ObservedObject private var account = Account.shared
+
+    var body: some View {
+        NavigationStack {
+            HuskPageList {
+                Section {
+                    Button { Router.shared.showProfile = true } label: { accountCard }
+                        .foregroundStyle(.primary)
+                } footer: {
+                    if !account.signedIn {
+                        Text("A Husk account keeps your profile, playtime and achievements, here and on itslevii.dev.")
+                    }
+                }
+
+                Section {
+                    row(JITSettings(), "bolt.fill", .yellow, "JIT & Sideload", "StikJIT is built in — the recommended way")
+                } header: {
+                    Text("JIT")
+                } footer: {
+                    Text("Android and Translation Layer games need JIT. StikJIT, built into Husk, turns it on without a computer.")
+                }
+
+                Section("General") {
+                    row(DiscoverView(), "sparkle.magnifyingglass", .mint, "Discover", "Find apps in F-Droid and other repositories")
+                    row(LibrarySettings(), "square.grid.2x2.fill", .blue, "Library", "Your apps and their icons")
+                    row(PerformanceSettings(), "speedometer", .orange, "Performance", "Renderer, sound")
+                    row(AppearanceSettings(), "paintbrush.fill", .pink, "Appearance", "Light or dark, accent colour, app icon")
+                    row(FontSettings(), "textformat", .indigo, "Fonts", "Chinese, Japanese and Korean text")
+                    row(FAQTab(), "questionmark.circle.fill", .teal, "Help", "Answers to common problems")
+                    row(AboutSettings(), "info.circle.fill", .gray, "About Husk", "Version \(Bundle.main.version) · \(Bundle.main.commit)")
+                }
+
+                Section {
+                    Toggle(isOn: $multitask) {
+                        Label {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Open Apps in Windows")
+                                Text("Use Husk while an app runs").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        } icon: {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(Color.purple.huskGradient)
+                                .frame(width: 30, height: 30)
+                                .overlay {
+                                    Image(systemName: "macwindow.on.rectangle")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundStyle(.white)
+                                }
+                        }
+                    }
+                } header: {
+                    Text("Multitasking")
+                } footer: {
+                    Text("Apps and games open in a window you can move, resize and minimise to a dock, like LiveContainer's multitasking. "
+                       + "Each app can override this in its own settings.")
+                }
+
+                Section {
+                    Toggle(isOn: $askCompat) {
+                        Label {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Ask How Games Ran")
+                                Text("After playing, once per game per update").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        } icon: {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(Color.green.huskGradient)
+                                .frame(width: 30, height: 30)
+                                .overlay {
+                                    Image(systemName: "list.bullet.clipboard")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundStyle(.white)
+                                }
+                        }
+                    }
+                    Link(destination: CompatibilityStore.site) {
+                        Label("Compatibility List", systemImage: "safari")
+                    }
+                } header: {
+                    Text("Compatibility")
+                } footer: {
+                    Text("Game pages and the Store show how each app runs for everyone, from itslevii.dev. Your reports go there "
+                       + "with your device, iOS version, Husk build and JIT method.")
+                }
+
+                Section {
+                    row(AndroidSystemPage(), "apps.iphone", AndroidMark.green, "Android", "Experimental: full Android in an emulator")
+                    row(RootSettings(), "lock.shield.fill", .red, "Root & Systems", "Multiple Android systems, one-tap root")
+                    row(InputSettings(), "hand.tap.fill", .indigo, "Input", "Screen, touch, keyboard")
+                    row(NetworkSettings(), "globe", .green, "Network", "Internet and saved sessions")
+                    row(SavedMachineSettings(), "externaldrive.fill", .teal, "Saved Machine", "Snapshots and automatic saving")
+                } header: {
+                    Text("Android Emulator")
+                } footer: {
+                    Text("Full Android runs in an emulator, for the apps the Translation Layer can't run yet. It is experimental: slow, "
+                       + "and it can freeze or crash.")
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle("Settings")
+        }
+    }
+
+    /// The top of Settings, as iOS puts the Apple Account there: the Husk account (or the way to sign in), and which Husk this is.
+    private var accountCard: some View {
+        HStack(spacing: 14) {
+            ZStack(alignment: .bottomTrailing) {
+                if account.signedIn { AccountAvatar(size: 60) } else { HuskMark(size: 60) }
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(account.signedIn ? (account.user?.displayName ?? "Husk Account") : "Sign In")
+                    .font(.title3.weight(.semibold))
+                Text(account.signedIn ? "@" + (account.user?.username ?? "") : "Profile, playtime and achievements")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text("Husk \(Bundle.main.version) · \(Bundle.main.commit)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+    }
+
+    private func row<D: View>(_ destination: D, _ icon: String, _ tint: Color,
+                              _ title: String, _ subtitle: String) -> some View {
+        NavigationLink { destination } label: {
+            Label {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            } icon: {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(tint.huskGradient)
+                    .frame(width: 30, height: 30)
+                    .overlay {
+                        Image(systemName: icon)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(.white)
+                    }
+            }
+        }
+    }
+}
+
+/// A Form, as the system draws one.
+private struct HuskFormStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content.navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+extension View {
+    func huskForm() -> some View { modifier(HuskFormStyle()) }
+}
+
+// MARK: - Library
+
+struct LibrarySettings: View {
+    @ObservedObject private var host = AndroidHost.shared
+    @State private var working = false
+
+    var body: some View {
+        HuskForm {
+            Section {
+                DetailRow(label: "Apps", value: "\(host.packages.count)", mono: false)
+                DetailRow(label: "With icons",
+                          value: "\(host.packages.filter { $0.iconPath != nil }.count)",
+                          mono: false)
+            } footer: {
+                Text("The list is written to disk, so it is on screen before Android "
+                   + "has finished starting.")
+            }
+
+            Section {
+                Button {
+                    working = true
+                    Task { await host.refreshPackages(); working = false }
+                } label: {
+                    Label(working ? "Refreshing…" : "Refresh from Android",
+                          systemImage: "arrow.clockwise")
+                }
+                .disabled(working || !host.isReady)
+
+                Button {
+                    AndroidHost.forgetIcons()
+                    working = true
+                    Task { await host.refreshPackages(); working = false }
+                } label: {
+                    Label("Re-fetch icons", systemImage: "photo.on.rectangle")
+                }
+                .disabled(working || !host.isReady)
+            } footer: {
+                Text("Names and icons come from Android's own launcher, which keeps "
+                   + "the version it draws. Re-fetching throws away Husk's copies and "
+                   + "asks again.")
+            }
+        }
+        .huskForm()
+        .navigationTitle("Library")
+    }
+}
+
+// MARK: - Fonts
+
+/// The Chinese, Japanese and Korean fonts the bundle leaves out (#95: 58 MB of Android's 82 MB of fonts), downloaded on request. Apps
+/// on the translation layer find them where Android keeps them, through fonts.xml, which already names the file.
+@MainActor
+final class CJKFonts: ObservableObject {
+    static let shared = CJKFonts()
+    static let fileName = "NotoSansCJK-Regular.ttc"
+    static let source = URL(string: "https://github.com/notofonts/noto-cjk/raw/main/Sans/OTC/NotoSansCJK-Regular.ttc")!
+    nonisolated static var directory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Fonts", isDirectory: true)
+    }
+    nonisolated static var installed: Bool { FileManager.default.fileExists(atPath: directory.appendingPathComponent(fileName).path) }
+
+    @Published private(set) var isInstalled = CJKFonts.installed
+    @Published private(set) var downloading = false
+    @Published private(set) var failure: String?
+
+    func download() {
+        guard !downloading else { return }
+        downloading = true
+        failure = nil
+        Task {
+            do {
+                let (temp, response) = try await URLSession.shared.download(from: Self.source)
+                guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+                try FileManager.default.createDirectory(at: Self.directory, withIntermediateDirectories: true)
+                let dest = Self.directory.appendingPathComponent(Self.fileName)
+                try? FileManager.default.removeItem(at: dest)
+                try FileManager.default.moveItem(at: temp, to: dest)
+                HuskLog.log("fonts", "CJK fonts installed at \(dest.path)")
+                isInstalled = true
+            } catch {
+                failure = "The download failed: \(error.localizedDescription)"
+                HuskLog.log("fonts", "CJK font download failed: \(error.localizedDescription)")
+            }
+            downloading = false
+        }
+    }
+
+    func remove() {
+        try? FileManager.default.removeItem(at: Self.directory.appendingPathComponent(Self.fileName))
+        isInstalled = Self.installed
+    }
+}
+
+struct FontSettings: View {
+    @ObservedObject private var fonts = CJKFonts.shared
+
+    var body: some View {
+        HuskForm {
+            Section {
+                if fonts.isInstalled {
+                    Label("Installed", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Button(role: .destructive) { fonts.remove() } label: { Label("Remove", systemImage: "trash") }
+                } else {
+                    Button { fonts.download() } label: {
+                        Label(fonts.downloading ? "Downloading…" : "Download (19.5 MB)", systemImage: "arrow.down.circle")
+                    }
+                    .disabled(fonts.downloading)
+                }
+                if let failure = fonts.failure { Text(failure).font(.caption).foregroundStyle(.red) }
+            } header: {
+                Text("Chinese, Japanese and Korean")
+            } footer: {
+                Text("Noto Sans CJK, the font Android uses for these languages. Games and apps that draw their own text (Unity, Flutter, "
+                   + "cocos2d-x) show empty boxes for these characters without it. Takes effect the next time an app opens.")
+            }
+        }
+        .huskForm()
+        .navigationTitle("Fonts")
+    }
+}
+
+// MARK: - Performance
+
+struct PerformanceSettings: View {
+    @ObservedObject private var runner = QemuRunner.shared
+    @State private var gpuMode =
+        UserDefaults.standard.object(forKey: "husk.gpuMode") as? Bool ?? true
+    @State private var sound = UserDefaults.standard.bool(forKey: "husk.sound")
+    @State private var soundDevice =
+        UserDefaults.standard.object(forKey: "husk.soundDevice") as? Bool ?? true
+
+    var body: some View {
+        HuskForm {
+            Section {
+                Picker("Renderer", selection: $gpuMode) {
+                    Text("GPU").tag(true)
+                    Text("CPU").tag(false)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: gpuMode) { v in
+                    UserDefaults.standard.set(v, forKey: "husk.gpuMode")
+                    HuskLog.log("ui", v ? "GPU renderer selected" : "CPU renderer selected")
+                }
+            } header: {
+                Text("Renderer")
+            } footer: {
+                Text(gpuMode
+                     ? "Android draws on the real GPU through Metal — about four times "
+                     + "the frame rate. This is the default."
+                     : "Every pixel is drawn by the emulated CPU. Much slower, and only "
+                     + "worth choosing if the GPU misbehaves.")
+            }
+
+            Section {
+                DetailRow(label: "Frame rate",
+                          value: runner.fps > 0
+                                 ? String(format: "%.0f fps", runner.fps) : "—")
+                DetailRow(label: "Guest screen",
+                          value: "\(QemuRunner.lastGuestRes.w)×\(QemuRunner.lastGuestRes.h)")
+            } header: {
+                Text("Now")
+            }
+
+            Section {
+                Toggle("Sound", isOn: $sound)
+                    .onChange(of: sound) { v in
+                        UserDefaults.standard.set(v, forKey: "husk.sound")
+                        HuskLog.log("ui", v ? "sound on" : "sound off")
+                    }
+                if sound {
+                    Toggle("Attach the sound device", isOn: $soundDevice)
+                        .onChange(of: soundDevice) { v in
+                            UserDefaults.standard.set(v, forKey: "husk.soundDevice")
+                        }
+                }
+            } header: {
+                Text("Sound")
+            } footer: {
+                Text("Adds a sound device. While it is attached Android cannot be "
+                   + "saved — QEMU refuses to snapshot a machine with one — so every "
+                   + "launch boots from cold. Turning it on or off costs a cold boot "
+                   + "either way.")
+            }
+        }
+        .huskForm()
+        .navigationTitle("Performance")
+    }
+}
+
+// MARK: - Input
+
+struct InputSettings: View {
+    @State private var landscapeGuest =
+        UserDefaults.standard.bool(forKey: "husk.landscapeGuest")
+    @State private var customRes = UserDefaults.standard.bool(forKey: "husk.customRes")
+    @State private var widthText = InputSettings.stored("husk.resWidth", 720)
+    @State private var heightText = InputSettings.stored("husk.resHeight", 1280)
+
+    /// Sizes worth offering without typing. Deliberately short: these are the
+    /// shapes a phone guest is actually run at, not a catalogue of every panel
+    /// ever made.
+    private static let presets: [(name: String, w: Int, h: Int)] = [
+        ("Small — 360 × 800", 360, 800),
+        ("HD — 720 × 1280", 720, 1280),
+        ("Full HD — 1080 × 1920", 1080, 1920),
+        ("Landscape HD — 1280 × 720", 1280, 720),
+        ("Tablet — 1280 × 800", 1280, 800),
+    ]
+
+    private static func stored(_ key: String, _ fallback: Int) -> String {
+        let v = UserDefaults.standard.integer(forKey: key)
+        return String(v > 0 ? v : fallback)
+    }
+
+    /// What the typed numbers actually come to, or nothing if they are not a
+    /// size the guest can be given.
+    private var effective: (w: Int, h: Int)? {
+        QemuRunner.validResolution(w: Int(widthText) ?? 0, h: Int(heightText) ?? 0)
+    }
+
+    var body: some View {
+        HuskForm {
+            Section {
+                Picker("Screen", selection: $landscapeGuest) {
+                    Text("Portrait").tag(false)
+                    Text("Landscape").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .disabled(customRes)
+                .onChange(of: landscapeGuest) { v in
+                    UserDefaults.standard.set(v, forKey: "husk.landscapeGuest")
+                    HuskLog.log("ui", v ? "guest panel will be landscape"
+                                        : "guest panel will be portrait")
+                }
+            } header: {
+                Text("Screen")
+            } footer: {
+                Text(customRes
+                     ? "A custom resolution sets the shape itself, so this does nothing "
+                     + "while it is on. Type a wide size for landscape."
+                     : "Android cannot reshape a screen once it is running, so a "
+                     + "landscape game on a portrait screen gets letterboxed into a "
+                     + "band and looks tiny. Creating it landscape is the only way it "
+                     + "can fill it — portrait apps are letterboxed instead. Costs one "
+                     + "cold boot.")
+            }
+
+            Section {
+                Toggle("Custom resolution", isOn: $customRes)
+                    .onChange(of: customRes) { v in
+                        UserDefaults.standard.set(v, forKey: "husk.customRes")
+                        store()
+                        HuskLog.log("ui", v ? "custom resolution on: "
+                                            + "\(widthText)x\(heightText)"
+                                            : "custom resolution off")
+                    }
+
+                if customRes {
+                    Picker("Preset", selection: Binding(
+                        get: { presetIndex },
+                        set: { i in
+                            guard i >= 0, i < Self.presets.count else { return }
+                            widthText = String(Self.presets[i].w)
+                            heightText = String(Self.presets[i].h)
+                            store()
+                        })) {
+                        ForEach(0..<Self.presets.count, id: \.self) { i in
+                            Text(Self.presets[i].name).tag(i)
+                        }
+                        Text("Custom").tag(-1)
+                    }
+
+                    HStack {
+                        Text("Width")
+                        Spacer()
+                        TextField("720", text: $widthText)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .font(.technical())
+                            .frame(width: 90)
+                            .onChange(of: widthText) { _ in store() }
+                    }
+                    HStack {
+                        Text("Height")
+                        Spacer()
+                        TextField("1280", text: $heightText)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .font(.technical())
+                            .frame(width: 90)
+                            .onChange(of: heightText) { _ in store() }
+                    }
+
+                    if let size = effective {
+                        DetailRow(label: "Android will get",
+                                  value: "\(size.w) × \(size.h)")
+                    } else {
+                        Text("Both sides must be between 240 and 2560.")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                }
+
+                DetailRow(label: "Running now", value: running)
+            } header: {
+                Text("Resolution")
+            } footer: {
+                Text("The panel is built when the machine starts, so a change costs "
+                   + "one cold boot, and the next save replaces the machine saved at "
+                   + "the old size — changing back costs another. Sizes are rounded "
+                   + "to a multiple of eight. Bigger is slower: every pixel is drawn "
+                   + "by an emulated phone. Android's density does not change with "
+                   + "the panel, so a larger one shows more rather than bigger.")
+            }
+
+            Section {
+                Text("Touch is always on. The keyboard and the rotate control are "
+                   + "in the pill at the bottom of the guest's screen; a gamepad "
+                   + "and a pointer are not wired through yet.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            } header: {
+                Text("Controls")
+            }
+        }
+        .huskForm()
+        .navigationTitle("Input")
+    }
+
+    /// The panel the guest actually has, which only means anything while there
+    /// is a guest: the stored value is last launch's until one starts.
+    private var running: String {
+        guard QemuRunner.shared.isRunning else { return "not started" }
+        return "\(QemuRunner.lastGuestRes.w) × \(QemuRunner.lastGuestRes.h)"
+    }
+
+    /// Which preset the typed numbers are, if any.
+    private var presetIndex: Int {
+        guard let size = effective else { return -1 }
+        return Self.presets.firstIndex { $0.w == size.w && $0.h == size.h } ?? -1
+    }
+
+    private func store() {
+        UserDefaults.standard.set(Int(widthText) ?? 0, forKey: "husk.resWidth")
+        UserDefaults.standard.set(Int(heightText) ?? 0, forKey: "husk.resHeight")
+    }
+}
+
+// MARK: - Network
+
+struct NetworkSettings: View {
+    @State private var keepNetwork =
+        UserDefaults.standard.object(forKey: "husk.keepNetwork") as? Bool ?? true
+
+    var body: some View {
+        HuskForm {
+            Section {
+                Toggle("Keep the network across saves", isOn: $keepNetwork)
+                    .onChange(of: keepNetwork) { v in
+                        UserDefaults.standard.set(v, forKey: "husk.keepNetwork")
+                    }
+            } footer: {
+                Text(keepNetwork
+                     ? "Saving closes apps but leaves Android's framework running, so "
+                     + "the network still works after a restore."
+                     : "Saving stops the framework too. Clears every GPU resource, "
+                     + "which is steadier — but the network may not come back until a "
+                     + "cold boot.")
+            }
+
+            Section {
+                Text("Android reaches the internet through a virtual ethernet card "
+                   + "on QEMU's own network. Nothing on your phone's network can see "
+                   + "the guest, and the guest cannot see it.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            } header: {
+                Text("How it connects")
+            }
+        }
+        .huskForm()
+        .navigationTitle("Network")
+    }
+}
+
+// MARK: - JIT and sideloading
+
+struct JITSettings: View {
+    @ObservedObject private var runner = QemuRunner.shared
+    @ObservedObject private var jit = JITCoordinator.shared
+    @State private var autoStart = Onboarding.autoStart
+    @AppStorage(JITCoordinator.autoEnableKey) private var autoJIT = false
+    @AppStorage(JITCoordinator.trollStoreAutoKey) private var trollStoreJIT = true
+    @State private var keepAttached = JITBootstrap.keepDebuggerAttached
+    @AppStorage(JITLess.key) private var jitless = false
+    @ObservedObject private var certificate = SigningCertificate.shared
+    @State private var pickedP12: Data?
+    @State private var p12Password = ""
+    @State private var cacheBytes = JITLess.cacheBytes
+
+    private var pairingLabel: String {
+        switch jit.pairingSource {
+        case .onDevice: return "paired on this device"
+        case .imported: return "file imported"
+        case nil: return "not set up"
+        }
+    }
+
+    var body: some View {
+        HuskForm {
+            Section {
+                JITCard()
+            }
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+
+            Section {
+                Toggle("JIT-less Mode", isOn: $jitless)
+                DetailRow(label: "Prebuilt games", value: JITLess.libraryCount > 0 ? "Geometry Dash" : "none in this build", mono: false)
+                if cacheBytes > 0 {
+                    DetailRow(label: "Converted games", value: ByteCountFormatter.string(fromByteCount: cacheBytes, countStyle: .file), mono: false)
+                    Button(role: .destructive) {
+                        JITLess.clearCache(); cacheBytes = JITLess.cacheBytes
+                    } label: { Label("Remove Converted Games", systemImage: "trash") }
+                }
+            } header: {
+                Text("Experimental")
+            } footer: {
+                Text("Android games run without JIT: their code is converted once and signed with your developer certificate, so no "
+                   + "debugger is needed. The first start of each game takes a few seconds longer. Geode mods and engines that "
+                   + "make code while they run still need JIT. While this is on, Husk makes no executable memory, even when JIT is on.")
+            }
+            .onAppear { cacheBytes = JITLess.cacheBytes }
+
+            Section {
+                if let info = certificate.info {
+                    DetailRow(label: "Team", value: info.teamID)
+                    DetailRow(label: "Expires", value: info.expires.formatted(date: .abbreviated, time: .shortened), mono: false)
+                    if info.expires < Date() {
+                        Text("This certificate has expired. Refresh Husk in your store, then import its certificate again.")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                } else {
+                    DetailRow(label: "Certificate", value: "not imported", mono: false)
+                }
+                ForEach(SigningCertificate.Store.allCases) { store in
+                    Button {
+                        certificate.requestFromStore(store)
+                    } label: { Label("Import from \(store.title)", systemImage: "arrow.down.circle") }
+                }
+                Button {
+                    HuskFilePicker.present(types: [.pkcs12, .data], multiple: false, onPick: { urls in
+                        guard let url = urls.first else { return }
+                        let scoped = url.startAccessingSecurityScopedResource()
+                        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                        guard let data = try? Data(contentsOf: url) else { certificate.lastError = "That file could not be read."; return }
+                        p12Password = ""
+                        pickedP12 = data
+                    }, onFail: { certificate.lastError = $0 })
+                } label: { Label("Import .p12 File", systemImage: "doc.badge.plus") }
+                if certificate.info != nil {
+                    Button(role: .destructive) { certificate.remove() } label: { Label("Remove Certificate", systemImage: "trash") }
+                }
+                if let why = certificate.lastError {
+                    Text(why).font(.caption).foregroundStyle(.orange)
+                }
+            } header: {
+                Text("Signing Certificate")
+            } footer: {
+                Text("JIT-less mode signs converted games with the certificate your store installed Husk with "
+                   + "\(SigningCertificate.installedTeamID.map { "(team \($0))" } ?? ""). SideStore and AltStore can hand it over; "
+                   + "or import the .p12 file and its password. It stays in this device's Keychain. A free Apple ID's certificate "
+                   + "changes every 7 days: import it again after refreshing Husk, and games are signed again on their next start.")
+            }
+            .sheet(isPresented: Binding(get: { pickedP12 != nil }, set: { if !$0 { pickedP12 = nil } })) {
+                NavigationView {
+                    Form {
+                        Section {
+                            SecureField("Password (empty if none)", text: $p12Password)
+                                .textContentType(.password)
+                        } footer: {
+                            Text("The password the .p12 file was exported with.")
+                        }
+                    }
+                    .navigationTitle("Certificate Password")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { pickedP12 = nil } }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Import") {
+                                if let data = pickedP12 { certificate.importP12(data, password: p12Password) }
+                                pickedP12 = nil
+                            }
+                        }
+                    }
+                }
+            }
+
+            Section {
+                Picker("Method", selection: $jit.method) {
+                    ForEach(JITMethod.allCases) { Text($0.title).tag($0) }
+                }
+                DetailRow(label: "StikDebug",
+                          value: JITBootstrap.isStikDebugInstalled ? "installed" : "not found", mono: false)
+                DetailRow(label: "TrollStore",
+                          value: JITBootstrap.isTrollStoreInstalled ? "installed" : "not found", mono: false)
+                DetailRow(label: "Installed with TrollStore",
+                          value: JITBootstrap.isInstalledWithTrollStore ? "yes" : "no", mono: false)
+                DetailRow(label: "Jailbreak",
+                          value: JITBootstrap.debuggedAtLaunch ? "JIT allowed for apps"
+                               : JITBootstrap.isJailbroken ? "found" : "not found", mono: false)
+                DetailRow(label: "Built-in pairing", value: pairingLabel, mono: false)
+                Button {
+                    jit.showSetup = true
+                } label: {
+                    Label("Set up JIT", systemImage: "wand.and.stars")
+                }
+            } header: {
+                Text("Other Ways to Turn On JIT")
+            } footer: {
+                Text(jit.method == .automatic
+                     ? jit.automaticDescription + " Built-in StikJIT needs iOS 26, LocalDevVPN, and a "
+                       + "pairing file, which Husk can make itself on iOS 27."
+                     : HuskBuiltInJIT.unavailableReason ?? "Built-in StikJIT needs LocalDevVPN and a pairing "
+                       + "file, which Husk can make itself on iOS 27.")
+            }
+
+            Section {
+                DetailRow(label: "Debugger",
+                          value: JITBootstrap.isDebuggerAttached ? "attached" : "not attached",
+                          mono: false)
+                DetailRow(label: "Executable memory",
+                          value: JITBootstrap.isLive ? "granted" : "not claimed", mono: false)
+                // The two routes, named separately. Either one is enough, and
+                // when someone reports "JIT does not work" these two rows are
+                // the whole diagnosis.
+                DetailRow(label: "Trap servicer",
+                          value: husk_ios_jit_self_route() != nil ? "not needed"
+                               : JITBootstrap.prewarmed ? "answering" : "not answering",
+                          mono: false)
+                if let route = husk_ios_jit_self_route() {
+                    DetailRow(label: "Made by Husk",
+                              value: String(cString: route) == "MAP_JIT" ? "MAP_JIT (dynamic-codesigning)" : "plain memory (debugged or jailbroken)",
+                              mono: false)
+                }
+                // Cached answer only: running the probe from a view body
+                // could freeze the app (see JITBootstrap.mapJITWorks).
+                DetailRow(label: "MAP_JIT",
+                          value: JITBootstrap.deviceEnforcesTXM ? "not used (TXM)"
+                               : JITBootstrap.mapJITResult.map { $0 ? "executes" : "refused" }
+                                 ?? "not tested",
+                          mono: false)
+                DetailRow(label: "Debugger after setup",
+                          value: JITBootstrap.detached ? "detached" : "attached",
+                          mono: false)
+                if let why = JITBootstrap.lastFailure {
+                    Text(why).font(.caption).foregroundStyle(.orange)
+                }
+                if !JITBootstrap.ready {
+                    Button {
+                        jit.enable()
+                    } label: {
+                        Label("Enable JIT with \(jit.resolvedMethod.title)", systemImage: "bolt.fill")
+                    }
+                    .disabled(jit.busy)
+                    Button {
+                        _ = JITBootstrap.requestTrollStoreAttach()
+                    } label: {
+                        Label("Enable JIT with TrollStore", systemImage: "sparkles")
+                    }
+                }
+            } header: {
+                Text("JIT")
+            } footer: {
+                Text("Husk needs memory it can write and then execute, which on iOS "
+                   + "takes an attached debugger. There are two ways to get it: a "
+                   + "debugger that services trap requests, or a MAP_JIT mapping, "
+                   + "which the kernel allows any debugged process. Either one is "
+                   + "enough — which is available depends on the device and the iOS "
+                   + "version, so Husk tests both rather than assuming.")
+            }
+
+            if JITBootstrap.isInstalledWithTrollStore {
+                Section {
+                    Toggle("Turn On JIT with TrollStore at Launch", isOn: $trollStoreJIT)
+                } footer: {
+                    Text("Each time Husk opens without JIT, it asks TrollStore to turn it on. TrollStore's URL Scheme setting must be on.")
+                }
+            }
+
+            Section {
+                Toggle("Turn On JIT at Launch", isOn: $autoJIT)
+                    .disabled(!HuskBuiltInJIT.isAvailable)
+            } footer: {
+                Text(HuskBuiltInJIT.isAvailable
+                     ? "Each time Husk opens without JIT, it asks the built-in StikJIT to turn it on, so games are ready "
+                       + "without a tap. Needs StikJIT set up once (paired) first."
+                     : "Needs the built-in StikJIT, which is available on iOS 26 and later.")
+            }
+
+            Section {
+                Toggle("Start Android on launch", isOn: $autoStart)
+                    .onChange(of: autoStart) { v in
+                        UserDefaults.standard.set(v, forKey: "husk.autoStart")
+                    }
+            } footer: {
+                Text("Boots the guest as soon as Husk opens, when JIT is available.")
+            }
+
+            Section {
+                Toggle("Keep debugger attached", isOn: $keepAttached)
+                    .onChange(of: keepAttached) { v in JITBootstrap.keepDebuggerAttached = v }
+            } footer: {
+                Text("Off by default. Husk detaches StikDebug as soon as the "
+                   + "JIT region is held, because a debugger that iOS has suspended "
+                   + "stops the whole app the next time it is needed. Turn this on "
+                   + "only to collect StikDebug's own logs.")
+            }
+
+            Section {
+                Text("APKs install from the Library's + button or from the Files tab. "
+                   + "Split sets — a base APK plus its config pieces — must be picked "
+                   + "together; installing the base alone fails on missing native "
+                   + "libraries.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            } header: {
+                Text("Sideloading")
+            }
+        }
+        .huskForm()
+        .navigationTitle("JIT & sideload")
+    }
+}
+
+// MARK: - Saved machine
+
+struct SavedMachineSettings: View {
+    @ObservedObject private var runner = QemuRunner.shared
+    @State private var autoSave =
+        UserDefaults.standard.object(forKey: "husk.autoSave") as? Bool ?? true
+    @State private var useSnapshot =
+        UserDefaults.standard.object(forKey: "husk.downloadSnapshot") as? Bool ?? true
+    @State private var askWhichToDelete = false
+    @State private var deleteResult: String?
+    @State private var askRemoveAndroid = false
+    @State private var removeResult: String?
+    @State private var androidBytes = GuestImage.shared.androidBytes
+    @AppStorage(GuestImage.askUpdatesKey) private var askUpdates = true
+
+    var body: some View {
+        HuskForm {
+            Section {
+                Toggle("Save automatically", isOn: $autoSave)
+                    .onChange(of: autoSave) { v in
+                        UserDefaults.standard.set(v, forKey: "husk.autoSave")
+                        HuskLog.log("ui", v ? "automatic saving on" : "automatic saving off")
+                    }
+                Button {
+                    QemuRunner.shared.saveState(reason: "asked from settings")
+                } label: {
+                    Label(runner.isSavingState ? "Saving…" : "Save now",
+                          systemImage: "externaldrive.badge.checkmark")
+                }
+                .disabled(runner.isSavingState)
+            } footer: {
+                Text("Husk restores a saved machine instead of booting it, which takes "
+                   + "seconds rather than minutes. The picture freezes while it writes. "
+                   + "With this off, nothing saves by itself — including after an "
+                   + "install.")
+            }
+
+            Section {
+                Button(role: .destructive) { askWhichToDelete = true } label: {
+                    Label("Delete saved machine", systemImage: "trash")
+                }
+                .disabled(!QemuRunner.shared.hasSnapshot)
+                if let deleteResult {
+                    Text(deleteResult).font(.caption).foregroundStyle(.secondary)
+                }
+            } footer: {
+                Text(QemuRunner.shared.hasSnapshot
+                     ? "Currently saved: "
+                     + ((QemuRunner.shared.snapshotDisplay ?? "sw").contains("gl")
+                        ? "GPU" : "software") + "."
+                     : "Nothing is saved, so Android boots from cold.")
+            }
+
+            Section {
+                Toggle("Download pre-booted snapshot", isOn: $useSnapshot)
+                    .onChange(of: useSnapshot) { v in
+                        UserDefaults.standard.set(v, forKey: "husk.downloadSnapshot")
+                    }
+            } footer: {
+                Text("Adds about 2 GB to the first download. It was captured on the "
+                   + "software renderer, so it is not used on GPU — which cold-boots "
+                   + "once and then saves its own.")
+            }
+
+            Section {
+                Button(role: .destructive) { askRemoveAndroid = true } label: {
+                    Label("Remove Android", systemImage: "trash.slash")
+                }
+                .disabled(runner.isRunning || androidBytes == 0)
+                if let removeResult {
+                    Text(removeResult).font(.caption).foregroundStyle(.secondary)
+                }
+            } footer: {
+                Text(androidBytes > 0
+                     ? "Android's system, its data and the saved machine take \(ByteCountFormatter.string(fromByteCount: androidBytes, countStyle: .file)). "
+                     + "Apps and games on the translation layer do not need them. Android downloads again the next time it is started."
+                     : "Android is not downloaded.")
+            }
+
+            Section {
+                Toggle("Ask about Android updates", isOn: $askUpdates)
+            } footer: {
+                Text("When a new Android image or snapshot is published, Husk asks once whether to download it. "
+                   + "Never asked before Android has been downloaded.")
+            }
+        }
+        .huskForm()
+        .navigationTitle("Saved machine")
+        .confirmationDialog("Which saved machine?", isPresented: $askWhichToDelete,
+                            titleVisibility: .visible) {
+            Button("GPU machine", role: .destructive) { forget("gl", "GPU") }
+            Button("Software machine", role: .destructive) { forget("sw", "software") }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Android will boot from cold once, then save a new one.")
+        }
+        .confirmationDialog("Remove Android?", isPresented: $askRemoveAndroid, titleVisibility: .visible) {
+            Button("Remove Android", role: .destructive) {
+                let freed = GuestImage.shared.removeAll()
+                androidBytes = GuestImage.shared.androidBytes
+                removeResult = "Freed \(ByteCountFormatter.string(fromByteCount: freed, countStyle: .file))."
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Everything installed or saved inside Android is deleted. Translation layer apps keep their data.")
+        }
+    }
+
+    private func forget(_ mode: String, _ name: String) {
+        if QemuRunner.shared.forgetSnapshot(mode: mode) {
+            deleteResult = "Deleted the \(name) machine. The next launch boots from cold."
+        } else {
+            deleteResult = "No \(name) machine is saved, so nothing was deleted."
+        }
+    }
+}
+
+// MARK: - Appearance
+
+struct AppearanceSettings: View {
+    @State private var appIcon = HuskAppIcon.current
+    @AppStorage(Theme.Appearance.key) private var appearance = Theme.Appearance.system
+    @AppStorage(Holiday.key) private var holiday = true
+    @ObservedObject private var theme = AppTheme.shared
+    @Environment(\.colorScheme) private var scheme
+    @State private var custom: Color = AppTheme.shared.accentColor
+
+    private let iconColumns = [GridItem(.adaptive(minimum: 92), spacing: 14)]
+
+    var body: some View {
+        HuskForm {
+            Section {
+                Picker("Appearance", selection: $appearance) {
+                    ForEach(Theme.Appearance.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: appearance) { v in
+                    HuskLog.log("ui", "appearance: \(v.rawValue)")
+                }
+                Toggle("Holiday Decorations", isOn: $holiday)
+            } header: {
+                Text("Theme")
+            } footer: {
+                Text("System follows the phone: light by day, dark by night. The guest's own "
+                   + "screen stays dark either way — it is a picture of another phone. "
+                   + "Holiday decorations appear from December to early January.")
+            }
+
+            Section {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 14) {
+                    ForEach(AppTheme.presets) { preset in
+                        Button {
+                            theme.accentColor = preset.color
+                            custom = preset.color
+                        } label: {
+                            swatch(preset.color, selected: preset.color.themeHex == theme.accentColor.themeHex)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(preset.name)
+                    }
+                }
+                .padding(.vertical, 6)
+
+                ColorPicker("Custom Colour", selection: $custom, supportsOpacity: false)
+                    .onChange(of: custom) { theme.accentColor = $0 }
+            } header: {
+                Text("Accent Colour")
+            } footer: {
+                Text("Tints buttons, switches and selected states throughout the app.")
+            }
+
+            Section {
+                LazyVGrid(columns: iconColumns, spacing: 14) {
+                    ForEach(HuskAppIcon.allCases) { icon in
+                        Button {
+                            appIcon = icon
+                            HuskAppIcon.apply(icon)
+                        } label: {
+                            VStack(spacing: 8) {
+                                if let art = icon.preview(dark: scheme == .dark) {
+                                    Image(uiImage: art)
+                                        .resizable().scaledToFit()
+                                        .frame(width: 60, height: 60)
+                                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .strokeBorder(appIcon == icon ? Color.accentColor : .clear, lineWidth: 3))
+                                }
+                                Text(icon.title)
+                                    .font(.caption)
+                                    .foregroundStyle(appIcon == icon ? Color.accentColor : .primary)
+                                    .lineLimit(1)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 6)
+            } header: {
+                Text("App Icon")
+            } footer: {
+                Text("Automatic follows the system appearance — light, dark and tinted. The others pin "
+                   + "one look. iOS shows its own confirmation after a change; that alert cannot be turned off.")
+            }
+        }
+        .navigationTitle("Appearance")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func swatch(_ color: Color, selected: Bool) -> some View {
+        Circle()
+            .fill(color)
+            .frame(width: 34, height: 34)
+            .overlay(Circle().strokeBorder(Color.primary.opacity(0.9), lineWidth: selected ? 2 : 0).padding(-4))
+            .overlay {
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(color.isLight ? .black : .white)
+                }
+            }
+            .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - About
+
+struct AboutSettings: View {
+    @ObservedObject private var runner = QemuRunner.shared
+    @State private var showLogs = false
+    @AppStorage(TranslationLayer.devInfoKey) private var devInfo = false
+
+    var body: some View {
+        HuskPageList {
+            Section {
+                VStack(spacing: 8) {
+                    HuskMark(size: 84)
+                    Text("Husk").font(.title2.weight(.semibold))
+                    Text("Version \(Bundle.main.version)")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .listRowBackground(Color.clear)
+            }
+
+            Section {
+                LabeledContent("Build", value: Bundle.main.commit)
+                LabeledContent("Guest image", value: GuestImage.imageVersion)
+                LabeledContent("Renderer",
+                               value: runner.displayKind == .gl ? "GPU"
+                                    : runner.displayKind == .software ? "CPU"
+                                    : "Not started")
+            }
+
+            Section {
+                Toggle(isOn: $devInfo) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Developer Info")
+                        Text("Technical detail in the Android Translation Layer screens: "
+                           + "library reports, device checks and run logs.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                if devInfo {
+                    NavigationLink { TLChecksView() } label: {
+                        Label("Device Checks", systemImage: "stethoscope")
+                    }
+                    NavigationLink { MassTestView() } label: {
+                        Label("Mass Test", systemImage: "square.stack.3d.down.forward")
+                    }
+                }
+                Button { showLogs = true } label: {
+                    Label("Open Console", systemImage: "terminal")
+                }
+            } footer: {
+                Text("Husk runs unmodified Android APKs in a real Android system on your iPhone. "
+                   + "The console shows Husk's live log, the guest's serial output and QEMU's own "
+                   + "output — the three files any problem here is diagnosed from.")
+            }
+        }
+        .navigationTitle("About")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showLogs) { LogView() }
+    }
+}
+
+extension Bundle {
+    var version: String {
+        (infoDictionary?["CFBundleShortVersionString"] as? String) ?? "?"
+    }
+    var commit: String {
+        (infoDictionary?["HuskBuildCommit"] as? String) ?? "?"
+    }
+}
+
+// MARK: - Root & Systems (this fork)
+
+/// A page under Settings, drawn exactly like the rest of Husk: a HuskForm with
+/// native groups. Two things live here:
+///   1. Multiple independent Android systems, one booted at a time.
+///   2. A one-tap root that patches the active system with Magisk or FolkPatch.
+struct RootSettings: View {
+    @ObservedObject private var machines = MachineStore.shared
+    @ObservedObject private var root = RootManager.shared
+
+    var body: some View {
+        HuskForm {
+            Section {
+                Picker("Manager", selection: $root.selected) {
+                    ForEach(MachineStore.RootKind.allCases, id: \.self) { kind in
+                        Text(kind.displayName).tag(kind)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Button { root.install() } label: {
+                    switch root.state {
+                    case .idle: Label("Install Root", systemImage: "lock.shield.fill")
+                    case .working(let s): Label(s, systemImage: "arrow.triangle.2.circlepath")
+                    case .done(let s): Label(s, systemImage: "checkmark.seal.fill")
+                    case .failed(let s): Label(s, systemImage: "xmark.octagon.fill")
+                    }
+                }
+                .disabled(isWorking)
+
+                if case .working(let s) = root.state {
+                    ProgressView().frame(height: 24)
+                }
+                if case .failed(let s) = root.state {
+                    Text(s).font(.footnote).foregroundStyle(.red)
+                }
+                if case .done(let s) = root.state {
+                    Text(s).font(.footnote).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Root")
+            } footer: {
+                Text("Magisk patches the boot ramdisk; FolkPatch magic-patches the kernel. "
+                   + "Android must be running for the patch to be applied to its boot image.")
+            }
+
+            Section {
+                ForEach(machines.instances) { machine in
+                    Button { machines.select(machine.id) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: machine.id == machines.activeID ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(machine.id == machines.activeID ? Color.green.huskGradient : .secondary)
+                            Text(machine.name).foregroundStyle(.primary)
+                            Spacer()
+                            if let kind = machine.rootedBy {
+                                Text(kind.displayName).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                Button { _ = machines.addInstance() } label: {
+                    Label("Add System", systemImage: "plus.circle")
+                }
+            } header: {
+                Text("Systems")
+            } footer: {
+                Text("Each system is an independent Android install. Only one runs at a time; "
+                   + "switching picks which one Husk boots next.")
+            }
+        }
+        .huskForm()
+        .navigationTitle("Root & Systems")
+    }
+
+    private var isWorking: Bool {
+        if case .working = root.state { return true }
+        return false
+    }
+}
